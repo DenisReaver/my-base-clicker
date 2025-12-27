@@ -1,14 +1,26 @@
 import { http, createConfig } from '@wagmi/core';
-import { base } from 'viem/chains'; // Base chain из viem
+import { base, baseSepolia } from 'viem/chains';
 import { injected, walletConnect } from '@wagmi/connectors';
 
+// WalletConnect — лучший способ для Base App
+const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID;
+
+if (!projectId) {
+  throw new Error('NEXT_PUBLIC_WC_PROJECT_ID не задан в .env.local!');
+}
+
 export const config = createConfig({
-  chains: [base],
+  chains: [base], 
   transports: {
     [base.id]: http(),
   },
   connectors: [
-    injected({ target: 'metaMask' }), // Для MetaMask
-    injected({ target: 'coinbaseWallet' }), // Для Coinbase Wallet/Base App
+    // MetaMask (работает как раньше)
+    injected({ target: 'metaMask' }),
+
+    // WalletConnect — идеально для Base App и других мобильных кошельков
+    walletConnect({
+      projectId,
+    }),
   ],
 });
