@@ -1,20 +1,37 @@
 'use client';
-import { useAccount, useConnect } from 'wagmi';
+
+import { useConnect, useAccount } from 'wagmi';
 
 export default function WalletConnect() {
   const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { connectors, connect } = useConnect();
+
+  // Фильтруем только нужные коннекторы
+  const availableConnectors = connectors.filter(
+    (c) => c.id === 'metaMask' || c.id === 'walletConnect'
+  );
+
+  if (isConnected) {
+    return (
+      <div className="text-center">
+        <p className="text-green-600 font-medium">
+          Подключено: {address?.slice(0, 6)}...{address?.slice(-4)}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      {!isConnected ? (
-        <div>
-          <button onClick={() => connect({ connector: connectors[0] })}>Connect MetaMask</button>
-          <button onClick={() => connect({ connector: connectors[1] })}>Connect Base App/Coinbase</button>
-        </div>
-      ) : (
-        <p>Connected: {address}</p>
-      )}
+    <div className="space-y-3">
+      {availableConnectors.map((connector) => (
+        <button
+          key={connector.id}
+          onClick={() => connect({ connector })}
+          className="w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition"
+        >
+          {connector.id === 'metaMask' ? 'Подключить MetaMask' : 'Подключить через WalletConnect (Base App, Trust Wallet и др.)'}
+        </button>
+      ))}
     </div>
   );
 }
