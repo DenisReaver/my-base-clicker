@@ -1,65 +1,116 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseGwei } from 'viem';
+import WalletConnect from './components/WalletConnect';
+import ClickerABI from './abi/ClickerABI.json'; // Путь к ABI
+
+const CONTRACT_ADDRESS = '0xFf3F7a0e0623b7dcf639c12bA39beF636857Bc62'; // ← Замени на реальный адрес!
 
 export default function Home() {
+  const [gasPrice, setGasPrice] = useState(1); // Цена в gwei
+
+  const { address, isConnected } = useAccount();
+
+  // Чтение счётчика on-chain
+  const { data: clickCount, refetch: refetchCount } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: ClickerABI,
+    functionName: 'getClickCount',
+  });
+
+  // Вызов функции click()
+  const {
+    writeContract,
+    data: hash,
+    isPending: isSending,
+    error: sendError,
+  } = useWriteContract();
+
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+  } = useWaitForTransactionReceipt({ hash });
+
+  const handleClick = async () => {
+    if (!isConnected || !address) {
+      alert('Сначала подключите кошелёк!');
+      return;
+    }
+
+    writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: ClickerABI,
+      functionName: 'click',
+      args: [], // Нет аргументов
+      maxFeePerGas: parseGwei(gasPrice.toString()),
+    });
+  };
+
+  // После подтверждения обновляем счётчик
+  useEffect(() => {
+    if (isConfirmed) {
+      refetchCount(); // Перезагружаем счётчик
+      alert('Клик засчитан on-chain!');
+    }
+  }, [isConfirmed, refetchCount]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-50">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center space-y-6">
+        <h1 className="text-3xl font-bold text-gray-800">Base On-Chain Clicker</h1>
+
+        <WalletConnect />
+
+        {isConnected && (
+          <>
+            <p className="text-lg">Кликов on-chain: <span className="font-bold text-blue-600">{Number(clickCount) || 0}</span></p>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Цена транзакции (maxFeePerGas в gwei):
+              </label>
+              <input
+                type="number"
+                min="0.01"
+                step="0.1"
+                value={gasPrice}
+                onChange={(e) => setGasPrice(Number(e.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <button
+              onClick={handleClick}
+              disabled={isSending || isConfirming}
+              className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition disabled:cursor-not-allowed"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+              {isSending ? 'Отправка...' : isConfirming ? 'Ожидание подтверждения...' : 'Клик → Вызвать click()'}
+            </button>
+
+            {hash && (
+              <div className="text-sm break-all bg-gray-100 p-3 rounded">
+                Хэш: <a href={`https://basescan.org/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                  {hash}
+                </a>
+              </div>
+            )}
+
+            {sendError && (
+              <p className="text-red-600">
+                Ошибка: {sendError.message}
+              </p>
+            )}
+
+            {isConfirmed && (
+              <p className="text-green-600 font-medium">
+                Транзакция подтверждена! Счётчик обновлён.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </main>
   );
 }
