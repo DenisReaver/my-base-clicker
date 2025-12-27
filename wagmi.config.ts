@@ -10,7 +10,7 @@ if (!projectId) {
 }
 
 export const config = createConfig({
-  chains: [base], 
+  chains: [base], // Для тестов замени на baseSepolia
   transports: {
     [base.id]: http(),
   },
